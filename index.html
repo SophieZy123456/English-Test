@@ -18,10 +18,7 @@
   }
   h1 { font-size:22px; text-align:center; color:#fff; margin-bottom:6px; }
   .subtitle { text-align:center; color:#c7d2fe; font-size:13px; margin-bottom:20px; }
-
   .topic-box { background:#f0f4ff; border-left:4px solid #4f46e5; padding:12px 14px; border-radius:8px; margin-bottom:18px; font-size:14px; color:#3730a3; }
-
-  /* 录音按钮 */
   .mic-wrap { text-align:center; padding:10px 0 4px; }
   .mic-btn {
     width:110px; height:110px; border-radius:50%; border:none;
@@ -29,7 +26,7 @@
     color:#fff; font-size:44px; cursor:pointer;
     box-shadow:0 10px 26px rgba(79,70,229,.45);
     transition:transform .15s, box-shadow .15s;
-    display:flex; align-items:center; justify-content:center;
+    display:inline-flex; align-items:center; justify-content:center;
   }
   .mic-btn:active { transform:scale(.94); }
   .mic-btn.recording {
@@ -43,7 +40,14 @@
   }
   .status { text-align:center; margin-top:12px; font-size:14px; color:#6b7280; min-height:20px; }
   .timer { text-align:center; font-size:26px; font-weight:700; color:#4f46e5; margin-top:6px; font-variant-numeric:tabular-nums; }
-
+  .live-box {
+    margin-top:14px; padding:12px; border-radius:10px;
+    background:#f0fdf4; border:1px dashed #4ade80;
+    font-size:14px; line-height:1.6; color:#166534;
+    min-height:52px; word-break:break-word;
+  }
+  .live-box .placeholder { color:#86efac; font-style:italic; }
+  .live-box .interim { color:#9ca3af; font-style:italic; }
   .btn {
     display:block; width:100%; padding:14px; border:none; border-radius:12px;
     font-size:16px; font-weight:600; cursor:pointer; margin-top:12px;
@@ -52,16 +56,12 @@
   .btn:active { opacity:.8; }
   .btn-primary { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:#fff; }
   .btn-ghost   { background:#eef2ff; color:#4f46e5; }
-
-  /* 转录文本 */
+  .btn:disabled { opacity:.6; cursor:not-allowed; }
   .transcript {
     background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px;
     padding:14px; font-size:15px; line-height:1.7; color:#374151;
     min-height:70px; word-break:break-word;
   }
-  .transcript .interim { color:#9ca3af; font-style:italic; }
-
-  /* 评分 */
   .score-row { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
   .score-item {
     flex:1; min-width:100px; background:#f8fafc; border-radius:14px;
@@ -77,7 +77,6 @@
   }
   .total-box .num { font-size:52px; font-weight:900; line-height:1; }
   .total-box .lvl { font-size:15px; margin-top:6px; opacity:.92; }
-
   .section-title {
     font-size:15px; font-weight:700; color:#1e293b;
     margin:18px 0 10px; padding-left:10px; border-left:4px solid #4f46e5;
@@ -89,9 +88,8 @@
   .tag-good { background:#dcfce7; color:#166534; }
   .tag-warn { background:#fef3c7; color:#92400e; }
   .tag-bad  { background:#fee2e2; color:#991b1b; }
-
   .hidden { display:none !important; }
-  .err { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; padding:12px; border-radius:10px; font-size:14px; line-height:1.6; }
+  .err { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; padding:12px; border-radius:10px; font-size:14px; line-height:1.6; margin-top:12px; }
   .footer-note { text-align:center; font-size:11px; color:#a5b4fc; padding:10px 0 20px; }
 </style>
 </head>
@@ -100,7 +98,7 @@
   <h1>🎯 英语智能语音评测</h1>
   <p class="subtitle">说完即评 · 内容 · 准确 · 流利</p>
 
-  <!-- 步骤1：输入话题 -->
+  <!-- 步骤1 -->
   <div class="card" id="stepTopic">
     <div class="topic-box">
       <strong>📌 建议话题</strong>（可自定义）<br>
@@ -112,7 +110,7 @@
     <button class="btn btn-primary" onclick="startSetup()">开始录音准备</button>
   </div>
 
-  <!-- 步骤2：录音 -->
+  <!-- 步骤2 -->
   <div class="card hidden" id="stepRecord">
     <div class="topic-box" id="showTopic"></div>
     <div class="mic-wrap">
@@ -120,11 +118,19 @@
     </div>
     <div class="timer" id="timer">00:00</div>
     <div class="status" id="status">点击麦克风开始说话</div>
+
+    <!-- 实时识别预览 -->
+    <div class="live-box" id="liveBox">
+      <span class="placeholder">识别到的英文会实时显示在这里…</span>
+    </div>
+
+    <div id="errorBox" class="err hidden"></div>
+
     <button class="btn btn-primary hidden" id="evalBtn" onclick="evaluate()">📊 生成评测报告</button>
     <button class="btn btn-ghost" onclick="resetAll()">重新开始</button>
   </div>
 
-  <!-- 步骤3：结果 -->
+  <!-- 步骤3 -->
   <div class="card hidden" id="stepResult">
     <div class="total-box">
       <div class="num" id="totalScore">0</div>
@@ -162,7 +168,17 @@
 </div>
 
 <script>
-/* ===================== 全局状态 ===================== */
+/* ===== 全局错误捕获：任何 JS 报错都显示在页面上 ===== */
+window.onerror = function(msg, url, line) {
+  const box = document.getElementById('errorBox');
+  if (box) {
+    box.classList.remove('hidden');
+    box.innerHTML = '⚠️ 页面脚本出错：' + msg + '（行 ' + line + '）';
+  }
+  return false;
+};
+
+/* ===== 状态 ===== */
 let mediaStream = null;
 let recognition = null;
 let isRecording = false;
@@ -171,10 +187,11 @@ let interimText = '';
 let startTime = 0;
 let timerInterval = null;
 let duration = 0;
-let wordTimestamps = [];   // 记录每个识别片段的到达时间，用于流利度
+let wordTimestamps = [];
 let speechSupported = true;
+let recognizing = false;
 
-/* ===================== 初始化检测 ===================== */
+/* ===== 初始化 ===== */
 window.addEventListener('load', () => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
@@ -184,7 +201,7 @@ window.addEventListener('load', () => {
   }
 });
 
-/* ===================== 开始设置 ===================== */
+/* ===== 开始设置 ===== */
 function startSetup() {
   const custom = document.getElementById('topicInput').value.trim();
   const topic = custom || 'Describe your favorite season and explain why.';
@@ -198,11 +215,19 @@ function startSetup() {
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(s => { mediaStream = s; })
-      .catch(() => {});
+      .catch(err => {
+        showError('❌ 麦克风权限被拒绝或不可用：' + err.message + '。请在浏览器地址栏左侧允许麦克风。');
+      });
   }
 }
 
-/* ===================== 录音控制 ===================== */
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.classList.remove('hidden');
+  box.innerHTML = msg;
+}
+
+/* ===== 录音 ===== */
 function toggleRecord() {
   if (isRecording) stopRecord();
   else startRecord();
@@ -210,6 +235,8 @@ function toggleRecord() {
 
 function startRecord() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showError('当前浏览器不支持语音识别，请换 Chrome / Edge。'); return; }
+
   recognition = new SR();
   recognition.lang = 'en-US';
   recognition.continuous = true;
@@ -220,6 +247,13 @@ function startRecord() {
   interimText = '';
   wordTimestamps = [];
   duration = 0;
+  document.getElementById('errorBox').classList.add('hidden');
+  updateLiveBox();
+
+  recognition.onstart = () => {
+    recognizing = true;
+    document.getElementById('status').textContent = '🔴 正在聆听… 请大声说英文';
+  };
 
   recognition.onresult = (event) => {
     let interim = '';
@@ -228,7 +262,6 @@ function startRecord() {
       const txt = res[0].transcript;
       if (res.isFinal) {
         finalText += txt + ' ';
-        // 记录该片段包含的单词数及时间点
         const words = txt.trim().split(/\s+/).filter(Boolean).length;
         wordTimestamps.push({ words, t: Date.now() - startTime });
       } else {
@@ -236,20 +269,30 @@ function startRecord() {
       }
     }
     interimText = interim;
-    renderTranscript();
+    updateLiveBox();
   };
 
   recognition.onerror = (e) => {
-    if (e.error === 'not-allowed') {
-      document.getElementById('status').textContent = '❌ 麦克风权限被拒绝，请在浏览器设置中允许。';
-      stopRecord();
+    // 常见错误处理
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      showError('❌ 麦克风权限被拒绝。请点击地址栏左侧的锁图标 → 允许麦克风 → 刷新页面。');
     } else if (e.error === 'no-speech') {
-      document.getElementById('status').textContent = '🔇 未检测到声音，请靠近麦克风再试。';
+      showError('🔇 没有检测到语音。请靠近麦克风、大声说英文后重试。');
+    } else if (e.error === 'network') {
+      showError('🌐 语音识别需要联网。请检查网络后重试。');
+    } else if (e.error === 'audio-capture') {
+      showError('🎤 未检测到麦克风设备。请检查设备连接。');
+    } else {
+      showError('识别出错：' + e.error);
     }
   };
 
   recognition.onend = () => {
-    if (isRecording) { try { recognition.start(); } catch(e){} } // 自动续听
+    recognizing = false;
+    if (isRecording) {
+      // 自动续听
+      try { recognition.start(); } catch(e) {}
+    }
   };
 
   try {
@@ -265,7 +308,7 @@ function startRecord() {
       document.getElementById('timer').textContent = formatTime(duration);
     }, 200);
   } catch (e) {
-    document.getElementById('status').textContent = '启动失败，请刷新页面重试。';
+    showError('启动失败：' + e.message + '。请刷新页面重试。');
   }
 }
 
@@ -276,135 +319,134 @@ function stopRecord() {
   document.getElementById('micBtn').classList.remove('recording');
   document.getElementById('status').textContent = '✅ 录音结束，点击下方生成报告';
 
-  if (finalText.trim().split(/\s+/).filter(Boolean).length >= 3) {
+  const wordCount = finalText.trim().split(/\s+/).filter(Boolean).length;
+  if (wordCount >= 3) {
     document.getElementById('evalBtn').classList.remove('hidden');
   } else {
-    document.getElementById('status').textContent = '⚠️ 内容太少，请重新录制';
+    document.getElementById('status').textContent = '⚠️ 没识别到内容，请重录';
+    showError('⚠️ 没有识别到任何英文。请检查：1) 麦克风是否允许 2) 是否对着麦克风大声说英文 3) 网络是否正常。');
   }
 }
 
-function renderTranscript() {
-  const box = document.getElementById('finalTranscript');
-  if (box) {
+function updateLiveBox() {
+  const box = document.getElementById('liveBox');
+  if (!finalText && !interimText) {
+    box.innerHTML = '<span class="placeholder">识别到的英文会实时显示在这里…</span>';
+  } else {
     box.innerHTML = escapeHtml(finalText) +
       (interimText ? '<span class="interim">' + escapeHtml(interimText) + '</span>' : '');
   }
 }
 
-/* ===================== 评测核心 ===================== */
+/* ===== 评测 ===== */
 function evaluate() {
-  const text = (finalText + ' ' + interimText).trim();
-  if (!text) { alert('没有识别到内容'); return; }
+  // 立刻给反馈
+  const btn = document.getElementById('evalBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 分析中…';
 
-  const words = text.toLowerCase().match(/[a-z']+/g) || [];
-  const wordCount = words.length;
-  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0);
-  const sentenceCount = Math.max(sentences.length, 1);
-  const avgSentenceLen = wordCount / sentenceCount;
-  const wpm = duration > 0 ? (wordCount / duration) * 60 : 0;
-
-  /* ---------- 1. 内容完整度 ---------- */
-  let content = 0;
-  // 长度分（40）
-  if (wordCount >= 80) content += 40;
-  else if (wordCount >= 50) content += 34;
-  else if (wordCount >= 30) content += 26;
-  else if (wordCount >= 15) content += 16;
-  else content += Math.round(wordCount * 0.9);
-  // 结构分（30）：句子数量
-  content += Math.min(sentenceCount * 6, 30);
-  // 词汇丰富度（30）：去重率
-  const unique = new Set(words.filter(w => w.length > 3));
-  const richRatio = wordCount > 0 ? unique.size / wordCount : 0;
-  content += Math.min(Math.round(richRatio * 120), 30);
-  content = clamp(content, 0, 100);
-
-  /* ---------- 2. 语言准确性 ---------- */
-  let accuracy = 100;
-  const issues = [];
-
-  // 语法规则（常见错误）
-  const grammarRules = [
-    { re: /\bbecause\s+the\s+weather\b/i, hint: '句首用 Because 开头属残缺句，可改为 "This is because..."' },
-    { re: /\bi\s+(go|see|eat|have|is|are)\b/i, hint: '注意时态，过去的事情请用过去式（went/saw/ate/had/was）' },
-    { re: /\bwe\s+(go|see|eat|have|is|are)\b/i, hint: '主语 we 后的动词时态需与语境一致' },
-    { re: /\bit\s+was\s+very\s+happy\b/i, hint: '"It was very happy" 搭配不当，应说 "We were very happy" 或 "It was a joyful experience"' },
-    { re: /\bpeople\s+is\b/i, hint: 'people 是复数，应搭配 are' },
-    { re: /\bhe\s+don't\b/i, hint: '第三人称单数应为 doesn\'t' },
-    { re: /\bmore\s+better\b/i, hint: '"more better" 重复比较级，应为 better' },
-    { re: /\bi\s+am\s+agree\b/i, hint: '应为 "I agree"' },
-    { re: /\bvery\s+much\s+(like|love)\b/i, hint: '应为 "like ... very much" 或 "really like"' },
-    { re: /\ba\s+apple\b/i, hint: 'apple 前应用 an' },
-    { re: /\bdidn't\s+went\b/i, hint: 'didn\'t 后接动词原形 go' }
-  ];
-  grammarRules.forEach(r => {
-    if (r.re.test(text)) { accuracy -= 8; issues.push(r.hint); }
-  });
-
-  // 句子过长/过短
-  if (avgSentenceLen > 28) { accuracy -= 6; issues.push('句子过长，建议拆分，避免 run-on sentence'); }
-  if (avgSentenceLen < 4 && sentenceCount > 1) { accuracy -= 4; issues.push('句子过短，可尝试用连接词合并'); }
-
-  // 填充词
-  const fillers = (text.match(/\b(um|uh|er|ah|like,|you know)\b/gi) || []).length;
-  if (fillers > 0) { accuracy -= Math.min(fillers * 3, 15); }
-
-  accuracy = clamp(accuracy, 0, 100);
-
-  /* ---------- 3. 流利度 ---------- */
-  let fluency = 100;
-  // 语速评分（理想 110–160 wpm）
-  if (wpm === 0) fluency = 40;
-  else if (wpm >= 110 && wpm <= 160) fluency = 100;
-  else if (wpm >= 90 && wpm < 110)  fluency = 85;
-  else if (wpm > 160 && wpm <= 190) fluency = 82;
-  else if (wpm >= 70 && wpm < 90)   fluency = 72;
-  else if (wpm > 190)               fluency = 68;
-  else                              fluency = 60;
-
-  // 停顿检测：片段之间的间隔
-  if (wordTimestamps.length > 1) {
-    let longPauses = 0;
-    for (let i = 1; i < wordTimestamps.length; i++) {
-      const gap = wordTimestamps[i].t - wordTimestamps[i-1].t;
-      if (gap > 2500) longPauses++;
+  try {
+    const text = (finalText + ' ' + interimText).trim();
+    if (!text) {
+      showError('❌ 没有识别到内容，无法评分。请重新录音。');
+      btn.disabled = false;
+      btn.textContent = '📊 生成评测报告';
+      return;
     }
-    fluency -= Math.min(longPauses * 6, 24);
+
+    const words = text.toLowerCase().match(/[a-z']+/g) || [];
+    const wordCount = words.length;
+    const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0);
+    const sentenceCount = Math.max(sentences.length, 1);
+    const avgSentenceLen = wordCount / sentenceCount;
+    const wpm = duration > 0 ? (wordCount / duration) * 60 : 0;
+
+    /* 内容完整度 */
+    let content = 0;
+    if (wordCount >= 80) content += 40;
+    else if (wordCount >= 50) content += 34;
+    else if (wordCount >= 30) content += 26;
+    else if (wordCount >= 15) content += 16;
+    else content += Math.round(wordCount * 0.9);
+    content += Math.min(sentenceCount * 6, 30);
+    const unique = new Set(words.filter(w => w.length > 3));
+    const richRatio = wordCount > 0 ? unique.size / wordCount : 0;
+    content += Math.min(Math.round(richRatio * 120), 30);
+    content = clamp(content, 0, 100);
+
+    /* 语言准确性 */
+    let accuracy = 100;
+    const issues = [];
+    const grammarRules = [
+      { re: /\bbecause\s+the\s+weather\b/i, hint: '句首用 Because 开头属残缺句，可改为 "This is because..."' },
+      { re: /\bi\s+(go|see|eat|have|is|are)\b/i, hint: '注意时态，过去的事请用过去式（went/saw/ate/had/was）' },
+      { re: /\bwe\s+(go|see|eat|have|is|are)\b/i, hint: '主语 we 后的动词时态需与语境一致' },
+      { re: /\bit\s+was\s+very\s+happy\b/i, hint: '"It was very happy" 搭配不当，应说 "We were very happy"' },
+      { re: /\bpeople\s+is\b/i, hint: 'people 是复数，应搭配 are' },
+      { re: /\bhe\s+don't\b/i, hint: '第三人称单数应为 doesn\'t' },
+      { re: /\bmore\s+better\b/i, hint: '"more better" 重复比较级，应为 better' },
+      { re: /\bi\s+am\s+agree\b/i, hint: '应为 "I agree"' },
+      { re: /\bvery\s+much\s+(like|love)\b/i, hint: '应为 "like ... very much" 或 "really like"' },
+      { re: /\ba\s+apple\b/i, hint: 'apple 前应用 an' },
+      { re: /\bdidn't\s+went\b/i, hint: 'didn\'t 后接动词原形 go' }
+    ];
+    grammarRules.forEach(r => {
+      if (r.re.test(text)) { accuracy -= 8; issues.push(r.hint); }
+    });
+    if (avgSentenceLen > 28) { accuracy -= 6; issues.push('句子过长，建议拆分'); }
+    if (avgSentenceLen < 4 && sentenceCount > 1) { accuracy -= 4; issues.push('句子过短，可尝试合并'); }
+    const fillers = (text.match(/\b(um|uh|er|ah|like,|you know)\b/gi) || []).length;
+    if (fillers > 0) accuracy -= Math.min(fillers * 3, 15);
+    accuracy = clamp(accuracy, 0, 100);
+
+    /* 流利度 */
+    let fluency = 100;
+    if (wpm === 0) fluency = 40;
+    else if (wpm >= 110 && wpm <= 160) fluency = 100;
+    else if (wpm >= 90 && wpm < 110)  fluency = 85;
+    else if (wpm > 160 && wpm <= 190) fluency = 82;
+    else if (wpm >= 70 && wpm < 90)   fluency = 72;
+    else if (wpm > 190)               fluency = 68;
+    else                              fluency = 60;
+    if (wordTimestamps.length > 1) {
+      let longPauses = 0;
+      for (let i = 1; i < wordTimestamps.length; i++) {
+        const gap = wordTimestamps[i].t - wordTimestamps[i-1].t;
+        if (gap > 2500) longPauses++;
+      }
+      fluency -= Math.min(longPauses * 6, 24);
+    }
+    fluency -= Math.min(fillers * 3, 15);
+    fluency = clamp(fluency, 0, 100);
+
+    const total = Math.round(content * 0.35 + accuracy * 0.35 + fluency * 0.30);
+
+    /* 渲染 */
+    document.getElementById('sContent').textContent  = content;
+    document.getElementById('sAccuracy').textContent = accuracy;
+    document.getElementById('sFluency').textContent  = fluency;
+    document.getElementById('totalScore').textContent = total;
+    document.getElementById('totalLevel').textContent = levelText(total);
+    document.getElementById('finalTranscript').textContent = text;
+    colorize('sContent', content);
+    colorize('sAccuracy', accuracy);
+    colorize('sFluency', fluency);
+    document.getElementById('feedbackBox').innerHTML =
+      buildFeedback({ content, accuracy, fluency, wordCount, sentenceCount, avgSentenceLen, wpm, issues });
+
+    showStep('stepResult');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    showError('❌ 生成报告出错：' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📊 生成评测报告';
   }
-
-  // 填充词同样扣流利度
-  fluency -= Math.min(fillers * 3, 15);
-  fluency = clamp(fluency, 0, 100);
-
-  /* ---------- 总分（加权） ---------- */
-  const total = Math.round(content * 0.35 + accuracy * 0.35 + fluency * 0.30);
-
-  /* ---------- 渲染 ---------- */
-  document.getElementById('sContent').textContent  = content;
-  document.getElementById('sAccuracy').textContent = accuracy;
-  document.getElementById('sFluency').textContent  = fluency;
-  document.getElementById('totalScore').textContent = total;
-  document.getElementById('totalLevel').textContent = levelText(total);
-  document.getElementById('finalTranscript').textContent = text;
-
-  // 颜色
-  colorize('sContent', content);
-  colorize('sAccuracy', accuracy);
-  colorize('sFluency', fluency);
-
-  // 建议
-  document.getElementById('feedbackBox').innerHTML =
-    buildFeedback({ content, accuracy, fluency, wordCount, sentenceCount, avgSentenceLen, wpm, issues, text });
-
-  showStep('stepResult');
-  document.getElementById('stepResult').scrollIntoView({ behavior: 'smooth' });
 }
 
-/* ===================== 建议生成 ===================== */
+/* ===== 建议生成 ===== */
 function buildFeedback(d) {
   let html = '';
-
-  // 内容
   html += '<p><span class="tag ' + tagOf(d.content) + '">内容完整度 ' + d.content + '</span>';
   if (d.content >= 80) html += '内容充实、结构清晰，能围绕话题展开。';
   else if (d.content >= 60) html += '内容基本完整，但深度和细节可再增加。';
@@ -416,7 +458,6 @@ function buildFeedback(d) {
   html += '<li>💡 多用感官细节和具体名词，例如把 "many fruits" 换成 "persimmons and chestnuts"。</li>';
   html += '</ul>';
 
-  // 准确性
   html += '<p><span class="tag ' + tagOf(d.accuracy) + '">语言准确性 ' + d.accuracy + '</span>';
   if (d.accuracy >= 85) html += '语法用词准确，表达地道。';
   else if (d.accuracy >= 70) html += '个别语法/搭配错误，整体可懂。';
@@ -430,7 +471,6 @@ function buildFeedback(d) {
     html += '<ul><li>✅ 未检测到明显语法问题，继续保持！</li></ul>';
   }
 
-  // 流利度
   html += '<p><span class="tag ' + tagOf(d.fluency) + '">流利度 ' + d.fluency + '</span>';
   html += '语速约 <b>' + Math.round(d.wpm) + ' 词/分钟</b>。';
   if (d.wpm < 90) html += '偏慢，可加强朗读练习。';
@@ -442,7 +482,6 @@ function buildFeedback(d) {
   html += '<li>💡 减少 um / uh / you know 等填充词。</li>';
   html += '</ul>';
 
-  // 综合
   html += '<p style="margin-top:14px;padding:12px;background:#eef2ff;border-radius:10px;">';
   if (d.content >= 75 && d.accuracy >= 75 && d.fluency >= 75) {
     html += '🎉 <b>整体优秀！</b>可以挑战更复杂的话题和更地道的表达。';
@@ -454,11 +493,10 @@ function buildFeedback(d) {
     html += '🎯 <b>重点提升：流利度。</b>用影子跟读法，录音回听纠正。';
   }
   html += '</p>';
-
   return html;
 }
 
-/* ===================== 工具函数 ===================== */
+/* ===== 工具 ===== */
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 function tagOf(s) { return s >= 80 ? 'tag-good' : s >= 60 ? 'tag-warn' : 'tag-bad'; }
 function levelText(s) {
@@ -492,6 +530,8 @@ function resetAll() {
   document.getElementById('status').textContent = '点击麦克风开始说话';
   document.getElementById('finalTranscript').innerHTML = '';
   document.getElementById('evalBtn').classList.add('hidden');
+  document.getElementById('errorBox').classList.add('hidden');
+  updateLiveBox();
   showStep('stepTopic');
 }
 </script>
